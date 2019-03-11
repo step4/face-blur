@@ -141,33 +141,33 @@ export default {
             let { _x, _y, _width, _height } = detection._box;
 
             console.log({ _x, _y, _width, _height, offsetTop, offsetLeft });
-            div.className = "box";
-            div.style.resize = "both";
-            div.style.position = "absolute";
-            div.style.width = `${_width}px`;
-            div.style.height = `${_height}px`;
-            div.style.top = `${_y + offsetTop}px`;
-            div.style.left = `${_x + offsetLeft}px`;
-            this.$refs.container.appendChild(div);
-            // _x -= 5;
-            // _y -= 5;
-            // let sqWidth = Math.max(_width, _height);
-            // sqWidth += 10;
+            // div.className = "box";
+            // div.style.resize = "both";
+            // div.style.position = "absolute";
+            // div.style.width = `${_width}px`;
+            // div.style.height = `${_height}px`;
+            // div.style.top = `${_y + offsetTop}px`;
+            // div.style.left = `${_x + offsetLeft}px`;
+            // this.$refs.container.appendChild(div);
+            _x -= 5;
+            _y -= 5;
+            let sqWidth = Math.max(_width, _height);
+            sqWidth += 10;
 
-            // cxt.strokeRect(_x, _y, sqWidth, sqWidth);
-            // cxt.filter = "blur(10px)";
-            // cxt.drawImage(
-            //   cv,
-            //   _x,
-            //   _y,
-            //   sqWidth,
-            //   sqWidth,
-            //   _x,
-            //   _y,
-            //   sqWidth,
-            //   sqWidth
-            // );
-            // cxt.restore();
+            cxt.strokeRect(_x, _y, sqWidth, sqWidth);
+            cxt.filter = "blur(10px)";
+            cxt.drawImage(
+              cv,
+              _x,
+              _y,
+              sqWidth,
+              sqWidth,
+              _x,
+              _y,
+              sqWidth,
+              sqWidth
+            );
+            cxt.restore();
           });
         }
       };
@@ -246,7 +246,7 @@ body {
 #canvas {
   background-color: darkgray;
 
-  height: 720px;
+  height: 480px;
 }
 .box {
   background: linear-gradient(135deg, #0ff 0, #0ff 94%, #fff 95%);
