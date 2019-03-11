@@ -7,13 +7,10 @@
       drop-placeholder="Drop file here..."
     />
     <b-container fluid class="my-2">
-      <b-row align-h="center">
+      <b-row align-h="center" ref="container">
         <canvas ref="canvas" id="canvas"></canvas>
       </b-row>
     </b-container>
-    <!-- <b-embed ref="vid" type="video" aspect="4by3" controls>
-      <source src type="video/mp4;codecs=&quot;avc1.42E01E, mp4a.40.2&quot;">
-    </b-embed>-->
     <label
       for="frameRange"
     >Current Frame: {{ currentFrame }}. Detection: {{currentDetectionIndex}}/{{frameCount}}</label>
@@ -45,7 +42,7 @@
 <script>
 var faceapi = require("face-api.js");
 import fs from "fs";
-import path from "path";
+import path, { relative } from "path";
 
 export default {
   name: "video-page",
@@ -60,7 +57,8 @@ export default {
       images: [],
       frameFolder: "",
       detections: [],
-      currentDetectionIndex: 0
+      currentDetectionIndex: 0,
+      canvas: null
     };
   },
   created() {
@@ -92,13 +90,7 @@ export default {
     );
   },
   mounted() {
-    let cv = this.$refs.canvas;
-    console.log(cv);
-    const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
-    // let vid = document.getElementById("video");
-    // vid.addEventListener("timeupdate", async event => {
-    //   console.log(await faceapi.detectAllFaces(vid, options));
-    // });
+    this.canvas = this.$refs.canvas;
   },
   watch: {
     file(oldFile) {
@@ -142,28 +134,40 @@ export default {
         cxt.drawImage(img, 0, 0, img.width, img.height);
         cxt.strokeStyle = "red";
         cxt.save();
+        let { offsetLeft, offsetTop } = this.$refs.canvas;
         if (this.detections[index] != undefined) {
           this.detections[index].forEach(detection => {
+            let div = document.createElement("div");
             let { _x, _y, _width, _height } = detection._box;
-            _x -= 5;
-            _y -= 5;
-            let sqWidth = Math.max(_width, _height);
-            sqWidth += 10;
 
-            cxt.strokeRect(_x, _y, sqWidth, sqWidth);
-            cxt.filter = "blur(10px)";
-            cxt.drawImage(
-              cv,
-              _x,
-              _y,
-              sqWidth,
-              sqWidth,
-              _x,
-              _y,
-              sqWidth,
-              sqWidth
-            );
-            cxt.restore();
+            console.log({ _x, _y, _width, _height, offsetTop, offsetLeft });
+            div.className = "box";
+            div.style.resize = "both";
+            div.style.position = "absolute";
+            div.style.width = `${_width}px`;
+            div.style.height = `${_height}px`;
+            div.style.top = `${_y + offsetTop}px`;
+            div.style.left = `${_x + offsetLeft}px`;
+            this.$refs.container.appendChild(div);
+            // _x -= 5;
+            // _y -= 5;
+            // let sqWidth = Math.max(_width, _height);
+            // sqWidth += 10;
+
+            // cxt.strokeRect(_x, _y, sqWidth, sqWidth);
+            // cxt.filter = "blur(10px)";
+            // cxt.drawImage(
+            //   cv,
+            //   _x,
+            //   _y,
+            //   sqWidth,
+            //   sqWidth,
+            //   _x,
+            //   _y,
+            //   sqWidth,
+            //   sqWidth
+            // );
+            // cxt.restore();
           });
         }
       };
@@ -242,6 +246,22 @@ body {
 #canvas {
   background-color: darkgray;
 
-  height: 480px;
+  height: 720px;
+}
+.box {
+  background: linear-gradient(135deg, #0ff 0, #0ff 94%, #fff 95%);
+  border: 3px solid #000;
+  overflow: auto;
+  width: 250px;
+  height: 250px;
+  font-weight: 700;
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+.container {
+  text-align: center;
 }
 </style>
