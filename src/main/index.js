@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
+import fs from 'fs'
 
 /**
  * Set `__static` path to static files in production
@@ -23,8 +24,8 @@ function createWindow() {
     useContentSize: true,
     width: 1000,
     webPreferences: {
-      webSecurity: false
-    }
+      webSecurity: false,
+    },
   })
 
   mainWindow.loadURL(winURL)
@@ -71,41 +72,59 @@ app.on('ready', () => {
 import ffmpegStatic from 'ffmpeg-static-electron'
 
 import ffmpeg from 'fluent-ffmpeg'
+ffmpeg.setFfmpegPath(ffmpegStatic.path)
+// ffmpeg.setFfprobePath('C:\\ffmpeg\\bin\\ffprobe.exe')
 console.log(app.getPath('userData'))
 
-ipcMain.on('newFile', async (event, pathToVid) => {
-  // event.sender.send('pong', Math.random())
+const directory = path.join(app.getPath('userData'), 'frames')
+if (!fs.existsSync(directory)) {
+  fs.mkdirSync(directory)
+}
+
+fs.readdir(directory, (err, files) => {
+  if (err) throw err
+
+  for (const file of files) {
+    fs.unlinkSync(path.join(directory, file), err => {
+      if (err) throw err
+    })
+  }
+})
+
+// ffmpeg.ffprobe('C:\\Users\\chris.RAC115149\\Desktop\\testFaceBlur\\MAH00287.MP4', function(err, metadata) {
+//   console.dir(metadata)
+// })
+
+const frameFolder = path.join(app.getPath('userData'), 'frames')
+
+ipcMain.on('extractFrames', async (event, pathToVid) => {
   console.log(pathToVid)
   var frameCount = 0
-  var fp = new Promise((resolve, reject) => {
+
+  var lastFrameEnqueued = 0
+  var extractFrames = new Promise((resolve, reject) => {
     ffmpeg(pathToVid)
       .on('error', err => {
+        console.log(err)
         reject(err)
-      })
-      .ffprobe(0, function(err, data) {
-        console.log(data)
-        resolve(data.streams[0].nb_frames)
-      })
-  })
-  frameCount = await fp
-  var fs = new Promise((resolve, reject) => {
-    ffmpeg(pathToVid)
-      .on('filenames', function(filenames) {
-        console.log('Will generate ' + filenames.join(', '))
       })
       .on('end', function() {
         console.log('Screenshots taken')
-        resolve()
+        resolve(lastFrameEnqueued)
       })
-      .screenshots({
-        // Will take screens at 20%, 40%, 60% and 80% of the video
-        count: frameCount,
-        filename: 'frame-%i.png',
-        folder: path.join(app.getPath('userData'), 'frames')
+      .on('progress', function(progress) {
+        lastFrameEnqueued = progress.frames
       })
+      .outputOptions(['-qscale:v 2'])
+      .save(path.join(frameFolder, 'frame%d.jpg'))
   })
-  await fs
-  ffmpeg(path.join(app.getPath('userData'), 'frames/frame-%d.png'))
-    .format('mp4')
-    .save('/Users/chris/Desktop/test.mp4')
+  frameCount = await extractFrames
+
+  console.log(frameCount)
+
+  // ffmpeg(path.join(frameFolder, 'frame%d.png'))
+  //   .format('mp4')
+  //   .save(path.join(app.getPath('desktop'), 'test.mp4'))
+
+  event.sender.send('allFramesExtracted', frameCount)
 })
