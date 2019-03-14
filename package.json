@@ -54,8 +54,10 @@
     }
   },
   "dependencies": {
+    "@tensorflow/tfjs-node": "^0.3.2",
     "axios": "^0.18.0",
     "bootstrap-vue": "^2.0.0-rc.14",
+    "canvas": "^2.3.1",
     "face-api.js": "^0.18.0",
     "ffmpeg-static-electron": "^2.0.1",
     "fluent-ffmpeg": "^2.1.2",

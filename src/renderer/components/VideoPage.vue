@@ -13,8 +13,14 @@
     </b-container>
     <label
       for="frameRange"
-    >Current Frame: {{ currentFrame }}. Detection: {{currentDetectionIndex}}/{{frameCount}}</label>
-    <b-form-input type="range" id="frameRange" v-model="currentFrame" min="1" :max="frameCount"/>
+    >Current Frame: {{ currentFrame }}. Detections done: {{detectionsDone}}/{{$store.state.videoData.frameCount}}</label>
+    <b-form-input
+      type="range"
+      id="frameRange"
+      v-model="currentFrame"
+      min="1"
+      :max="$store.state.videoData.frameCount"
+    />
     <b-modal
       v-model="loading"
       id="modal-center"
@@ -40,7 +46,7 @@
 </template>
 
 <script>
-var faceapi = require("face-api.js");
+import * as faceapi from "face-api.js";
 import fs from "fs";
 import path, { relative } from "path";
 
@@ -52,40 +58,37 @@ export default {
       file: null,
       loading: false,
       loadingTitle: "",
-      frameCount: 0,
       currentFrame: 0,
-      images: [],
-      frameFolder: "",
-      detections: [],
-      currentDetectionIndex: 0,
-      canvas: null
+      detectionsDone: 0,
+      options: new faceapi.SsdMobilenetv1Options({
+        minConfidence: 0.3
+      })
     };
   },
   created() {
     this.loadFaceAPI();
-    this.frameFolder = path.join(
-      this.$electron.remote.app.getPath("userData"),
-      "frames"
-    );
-    console.log(this.$electron);
     const that = this;
+    // this.$electron.ipcRenderer.on(
+    //   "allFramesExtracted",
+    //   async (event, detections) => {
+    //     console.log(detections);
+    //   }
+    // );
     this.$electron.ipcRenderer.on(
       "allFramesExtracted",
-      async (event, framesCount) => {
-        console.log(framesCount);
-        that.frameCount = framesCount;
+      async (event, { frameFolderPath, frameCount, videoName }) => {
+        await that.$store.dispatch("setFrameFolderPath", frameFolderPath);
+        await that.$store.dispatch("setFrameCount", frameCount);
+        await that.$store.dispatch("setVideoName", videoName);
 
+        await that.$store.dispatch(
+          "setDetection",
+          Array(that.$store.state.videoData.frameCount).fill()
+        );
+        that.loadingTitle = "Detecting faces...";
         that.loading = false;
-        that.loadingTitle = "Loading images...";
-        // that.loading = true;
-        that.loadImages();
-        // that.loading = false;
+        that.startDetecting();
         that.currentFrame = 1;
-
-        // that.loadingTitle = "Detecting faces...";
-        // that.loading = true;
-        // await that.detectFaces();
-        // that.loading = false;
       }
     );
   },
@@ -93,14 +96,12 @@ export default {
     this.canvas = this.$refs.canvas;
   },
   watch: {
-    file(oldFile) {
+    async file(newFile) {
       console.log(this.file);
-      // console.log(this.$refs.vid.children[0]);
-      // this.$refs.vid.children[0].src = `file://${this.file.path}`;
+      await this.$store.dispatch("setFilePath", this.file.path);
       this.$electron.ipcRenderer.send("extractFrames", this.file.path);
       this.loadingTitle = "Extracting frames...";
       this.loading = true;
-      // this.$refs.src.src = this.file;
     },
     currentFrame(val) {
       this.drawImgToCanvas(val);
@@ -129,102 +130,64 @@ export default {
       img.onload = () => {
         cv.width = img.width;
         cv.height = img.height;
-        let cxt = cv.getContext("2d");
-        cxt.lineWidth = 5;
-        cxt.drawImage(img, 0, 0, img.width, img.height);
-        cxt.strokeStyle = "red";
-        cxt.save();
+        let ctx = cv.getContext("2d");
+        ctx.lineWidth = 5;
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        ctx.strokeStyle = "red";
         let { offsetLeft, offsetTop } = this.$refs.canvas;
-        if (this.detections[index] != undefined) {
-          this.detections[index].forEach(detection => {
-            let div = document.createElement("div");
-            let { _x, _y, _width, _height } = detection._box;
+        if (this.$store.state.faceData.detection[index] != undefined) {
+          this.$store.state.faceData.detection[index].forEach(detection => {
+            let { x, y, width, height } = detection;
 
-            console.log({ _x, _y, _width, _height, offsetTop, offsetLeft });
-            // div.className = "box";
-            // div.style.resize = "both";
-            // div.style.position = "absolute";
-            // div.style.width = `${_width}px`;
-            // div.style.height = `${_height}px`;
-            // div.style.top = `${_y + offsetTop}px`;
-            // div.style.left = `${_x + offsetLeft}px`;
-            // this.$refs.container.appendChild(div);
-            _x -= 5;
-            _y -= 5;
-            let sqWidth = Math.max(_width, _height);
+            x -= 5;
+            y -= 5;
+            let sqWidth = Math.max(width, height);
             sqWidth += 10;
 
-            cxt.strokeRect(_x, _y, sqWidth, sqWidth);
-            cxt.filter = "blur(10px)";
-            cxt.drawImage(
-              cv,
-              _x,
-              _y,
-              sqWidth,
-              sqWidth,
-              _x,
-              _y,
-              sqWidth,
-              sqWidth
-            );
-            cxt.restore();
+            ctx.strokeRect(x, y, sqWidth, sqWidth);
           });
         }
       };
-      img.src = path.join(this.frameFolder, `frame${index}.jpg`);
+      img.src = path.join(
+        this.$store.state.pathsData.frameFolderPath,
+        `frame${index}.jpg`
+      );
     },
-    async loadImages() {
-      for (let i = 1; i <= this.frameCount; i++) {
-        await this.addImageProcess(
-          path.join(this.frameFolder, `frame${i}.jpg`),
+    async startDetecting() {
+      for (let i = 1; i <= this.$store.state.videoData.frameCount; i++) {
+        await this.detect(
+          path.join(
+            this.$store.state.pathsData.frameFolderPath,
+            `frame${i}.jpg`
+          ),
           i
         );
       }
     },
-    async addImageProcess(src, index) {
-      const options = new faceapi.SsdMobilenetv1Options({
-        minConfidence: 0.3
-      });
+    async detect(src, index) {
       let img = new Image();
-      // this.images.push(img);
       img.src = src;
-      // img.onload = () => resolve();
-      this.currentDetectionIndex = index;
-      let det = await faceapi.detectAllFaces(img, options);
-      console.log(det);
+      let det = await faceapi.detectAllFaces(img, this.options);
       if (det.length != 0) {
-        this.detections[index] = JSON.parse(JSON.stringify(det));
+        const detections = det.map(ele => {
+          return {
+            x: ele.box.x,
+            y: ele.box.y,
+            width: ele.box.width,
+            height: ele.box.height,
+            score: ele.score
+          };
+        });
+        const array = JSON.parse(JSON.stringify(detections));
+
+        await this.$store.dispatch("insertDetection", { array, index });
       } else {
-        console.log(JSON.parse(JSON.stringify(this.detections[index - 1])));
-        this.detections[index] = JSON.parse(
-          JSON.stringify(this.detections[index - 1])
-        );
+        await this.$store.dispatch("insertDetection", {
+          array: this.$store.state.faceData.detection[index - 1],
+          index
+        });
       }
-    },
-    async detectFaces() {
-      const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
-      this.images.forEach(async (ele, ind) => {
-        let det = await faceapi.detectAllFaces(ele, options);
-        console.log(det);
-        if (det.length != 0) {
-          this.detections[ind] = det;
-        }
-        console.log(ind);
-      });
-      // for (let i = 0; i <= this.frameCount - 1; i++) {
-      //   let det = await faceapi.detectAllFaces(this.images[i], options);
-      //   if (det.length != 0) {
-      //     this.detections[i] = det;
-      //   }
-      //   if (i % 20 == 0) {
-      //     console.log(i);
-      //   }
-      // }
-    },
-    async detect() {
-      const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
-      let vid = document.getElementById("video");
-      console.log(await faceapi.detectAllFaces(vid, options));
+      this.detectionsDone += 1;
     }
   }
 };
