@@ -9,9 +9,7 @@ import ffmpegStatic from 'ffmpeg-static-electron'
 import ffmpeg from 'fluent-ffmpeg'
 ffmpeg.setFfmpegPath(ffmpegStatic.path)
 
-// import * as canvas from 'canvas'
-
-// import * as faceapi from 'face-api.js'
+import { PythonShell } from 'python-shell'
 
 // // patch nodejs environment, we need to provide an implementation of
 // // HTMLCanvasElement and HTMLImageElement, additionally an implementation
@@ -143,6 +141,18 @@ ipcMain.on('extractFrames', async (event, videoPath) => {
   // ffmpeg(path.join(frameFolder, 'frame%d.png'))
   //   .format('mp4')
   //   .save(path.join(app.getPath('desktop'), 'test.mp4'))
+
+  let pyshell = new PythonShell('blur.py', {
+    mode: 'text',
+    pythonPath: 'C:\\Users\\chris.RAC115149\\Anaconda3\\envs\\pytorch\\python.exe',
+    scriptPath: 'C:\\Users\\chris.RAC115149\\Desktop\\testFaceBlur',
+    args: [videoPath],
+  })
+
+  pyshell.on('message', function(message) {
+    console.log(JSON.parse(message))
+    event.sender.send('data', JSON.parse(message))
+  })
 
   event.sender.send('allFramesExtracted', {
     frameFolderPath,
