@@ -54,11 +54,8 @@
     }
   },
   "dependencies": {
-    "@tensorflow/tfjs-node": "^0.3.2",
     "axios": "^0.18.0",
     "bootstrap-vue": "^2.0.0-rc.14",
-    "canvas": "^2.3.1",
-    "face-api.js": "^0.18.0",
     "ffmpeg-static-electron": "^2.0.1",
     "fluent-ffmpeg": "^2.1.2",
     "vue": "^2.5.16",
@@ -85,7 +82,7 @@
     "css-loader": "^0.28.11",
     "del": "^3.0.0",
     "devtron": "^1.4.0",
-    "electron": "^2.0.4",
+    "electron": "^4.0.8",
     "electron-builder": "^20.19.2",
     "electron-debug": "^1.5.0",
     "electron-devtools-installer": "^2.2.4",
